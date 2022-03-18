@@ -6,7 +6,9 @@ import {
   SourceFile,
   MethodDeclaration,
   ts,
+  ImportDeclaration,
 } from "ts-morph";
+
 export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
   private createFix(
     document: vscode.TextDocument,
@@ -63,6 +65,8 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
     sourcefile: SourceFile
   ) {
     const setup = this.getSetupBodyText(callExpression);
+    const vueImportDeclaration = sourcefile.getImportDeclaration("vue");
+
     const definePropsStatement = this.getPropsStatement(
       callExpression,
       setup?.propName
@@ -73,11 +77,22 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
       setup?.usesEmits ?? false
     );
 
-    //Todo remove import definecomponent
     sourcefile.removeDefaultExport();
+    vueImportDeclaration
+      ?.getNamedImports()
+      ?.filter((i) => i.getName() === "defineComponent")
+      .forEach((i) => i.remove());
 
-    definePropsStatement && sourcefile.addStatements(definePropsStatement);
-    defineEmitsStatement && sourcefile.addStatements(defineEmitsStatement);
+    if (definePropsStatement) {
+      sourcefile.addStatements(definePropsStatement);
+      vueImportDeclaration?.addNamedImport("defineProps");
+    }
+
+    if (defineEmitsStatement) {
+      sourcefile.addStatements(defineEmitsStatement);
+      vueImportDeclaration?.addNamedImport("defineEmit");
+    }
+
     setup && sourcefile.addStatements(setup.body);
   }
 
@@ -114,7 +129,7 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
 
     const constDeclartion = usesEmits ? `const emit =` : "";
     const emitInitializer = emitsStatement!.getInitializer()!.getText();
-    return `${constDeclartion} defineEmits(${emitInitializer});`;
+    return `${constDeclartion} defineEmit(${emitInitializer});`;
   }
 
   private getSetupBodyText(
