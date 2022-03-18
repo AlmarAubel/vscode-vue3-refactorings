@@ -1,17 +1,26 @@
 import * as vscode from "vscode";
-import { CallExpression, KindToNodeMappings, Project, ts } from "ts-morph";
-import { PropertyAssignment } from "@ts-morph/common/lib/typescript";
+import {
+  CallExpression,
+  KindToNodeMappings,
+  Project,
+  SourceFile,
+  ts,
+} from "ts-morph";
 export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
   private createFix(
     document: vscode.TextDocument,
     range: vscode.Range,
     emoji: string
   ): vscode.CodeAction {
-    console.log("flap");
     const fix = new vscode.CodeAction(
       `Refactor to Script setup`,
       vscode.CodeActionKind.RefactorRewrite
     );
+    const notFixable = new vscode.CodeAction(
+      "Not fixable",
+      vscode.CodeActionKind.Empty
+    );
+
     fix.edit = new vscode.WorkspaceEdit();
     const text = document.getText(range);
     const project = new Project({});
@@ -19,62 +28,99 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
     const sourcefile = project.createSourceFile("temp.ts", text);
 
     const defaultExport = sourcefile.getDefaultExportSymbolOrThrow();
+
     const exportedDeclarations = defaultExport.getDeclarations();
     if (!exportedDeclarations) {
       return fix;
     }
 
-    const callExpression =
+    const defineComponentExpression =
       exportedDeclarations[0].getFirstDescendantByKindOrThrow(
         ts.SyntaxKind.CallExpression
       );
 
-    const setupMethod = this.getChildOfType(
-      callExpression,
-      ts.SyntaxKind.MethodDeclaration
-    );
+    if (
+      defineComponentExpression.getExpression().getText() !== "defineComponent"
+    ) {
+      return notFixable;
+    }
 
-    const emitAndProps = this.getChildOfType(
-      callExpression,
-      ts.SyntaxKind.PropertyAssignment
-    );
+    defineComponentExpression.getExpression();
 
-    var definePropsStatement = "";
-    var defineEmitsStatement = "";
+    this.replaceDefineComponent(defineComponentExpression, sourcefile);
 
-    emitAndProps?.forEach((x) => {
-      if (x.getName() === "props") {
-        var dingen = x.getInitializer();
-
-        definePropsStatement = `const props = defineProps(${dingen?.getText()});`;
-      } else if (x.getName() === "emits") {
-        var dingen = x.getInitializer();
-        defineEmitsStatement = `const emit = defineEmits(${dingen?.getText()});`;
-      }
-    });
-    const setupBody = setupMethod![0]
-      .getBodyOrThrow()
-      .getChildSyntaxListOrThrow();
-
-    setupBody
-      .getChildrenOfKind(ts.SyntaxKind.ReturnStatement)
-      .forEach((x) => x.remove());
-
-    const setupStatement = setupBody?.getText() ?? "";
-    sourcefile.removeDefaultExport();
-
-    sourcefile.addStatements(definePropsStatement);
-    sourcefile.addStatements(defineEmitsStatement);
-    sourcefile.addStatements(setupStatement);
     sourcefile.formatText();
     fix.edit.replace(document.uri, range, sourcefile.getText());
 
-    this.AddSetupToScript(range, document, fix);
+    this.addSetupToScript(range, document, fix);
 
     return fix;
   }
 
-  private AddSetupToScript(
+  private replaceDefineComponent(
+    callExpression: CallExpression<ts.CallExpression>,
+    sourcefile: SourceFile
+  ) {
+    const setupStatement = this.getSetupBodyText(callExpression);
+    const definePropsStatement = this.getPropsStatement(callExpression);
+    const defineEmitsStatement = this.getEmitStatement(callExpression);
+
+    //Todo Check of setup gebruik maakt van Props en emit
+    //Todo remove import definecomponent
+    sourcefile.removeDefaultExport();
+
+    definePropsStatement && sourcefile.addStatements(definePropsStatement);
+    defineEmitsStatement && sourcefile.addStatements(defineEmitsStatement);
+    setupStatement && sourcefile.addStatements(setupStatement);
+  }
+
+  private getPropsStatement(callExpression: CallExpression<ts.CallExpression>) {
+    const propsStatement = this.getChildOfType(
+      callExpression,
+      ts.SyntaxKind.PropertyAssignment,
+      "props"
+    );
+    if (propsStatement === undefined) {
+      return undefined;
+    }
+    return `const props = defineProps(${propsStatement!
+      .getInitializer()!
+      .getText()});`;
+  }
+  private getEmitStatement(callExpression: CallExpression<ts.CallExpression>) {
+    const emitsStatement = this.getChildOfType(
+      callExpression,
+      ts.SyntaxKind.PropertyAssignment,
+      "emit"
+    );
+    if (emitsStatement === undefined) {
+      return undefined;
+    }
+    return `const emit = defineEmits(${emitsStatement!
+      .getInitializer()!
+      .getText()});`;
+  }
+
+  private getSetupBodyText(callExpression: CallExpression<ts.CallExpression>) {
+    const setupMethod = this.getChildOfType(
+      callExpression,
+      ts.SyntaxKind.MethodDeclaration,
+      "setup"
+    );
+
+    if (setupMethod === undefined) {
+      return undefined;
+    }
+
+    var setupBody = setupMethod.getBodyOrThrow().getChildSyntaxListOrThrow();
+    setupBody
+      .getChildrenOfKind(ts.SyntaxKind.ReturnStatement)
+      .forEach((x) => x.remove());
+
+    return setupBody.getText() ?? undefined;
+  }
+
+  private addSetupToScript(
     range: vscode.Range,
     document: vscode.TextDocument,
     fix: vscode.CodeAction
@@ -91,14 +137,20 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
     fix?.edit?.replace(document.uri, scriptTagRange, scriptTagWithSetup);
   }
 
-  private getChildOfType<TKind extends ts.SyntaxKind>(
+  private getChildOfType<
+    TKind extends
+      | ts.SyntaxKind.MethodDeclaration
+      | ts.SyntaxKind.PropertyAssignment
+  >(
     callExpression: CallExpression<ts.CallExpression>,
-    syntaxKind: TKind
-  ): KindToNodeMappings[TKind][] {
+    syntaxKind: TKind,
+    name: string
+  ): KindToNodeMappings[TKind] | undefined {
     return callExpression
       .getArguments()[0]
       .getChildSyntaxListOrThrow()
-      .getChildrenOfKind(syntaxKind);
+      .getChildrenOfKind(syntaxKind)
+      .find((x) => x.getName() === name);
   }
 
   provideCodeActions(
