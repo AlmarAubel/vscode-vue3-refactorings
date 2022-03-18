@@ -4,6 +4,7 @@ import {
   KindToNodeMappings,
   Project,
   SourceFile,
+  MethodDeclaration,
   ts,
 } from "ts-morph";
 export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
@@ -61,20 +62,29 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
     callExpression: CallExpression<ts.CallExpression>,
     sourcefile: SourceFile
   ) {
-    const setupStatement = this.getSetupBodyText(callExpression);
-    const definePropsStatement = this.getPropsStatement(callExpression);
-    const defineEmitsStatement = this.getEmitStatement(callExpression);
+    const setup = this.getSetupBodyText(callExpression);
+    const definePropsStatement = this.getPropsStatement(
+      callExpression,
+      setup?.propName
+    );
 
-    //Todo Check of setup gebruik maakt van Props en emit
+    const defineEmitsStatement = this.getEmitStatement(
+      callExpression,
+      setup?.usesEmits ?? false
+    );
+
     //Todo remove import definecomponent
     sourcefile.removeDefaultExport();
 
     definePropsStatement && sourcefile.addStatements(definePropsStatement);
     defineEmitsStatement && sourcefile.addStatements(defineEmitsStatement);
-    setupStatement && sourcefile.addStatements(setupStatement);
+    setup && sourcefile.addStatements(setup.body);
   }
 
-  private getPropsStatement(callExpression: CallExpression<ts.CallExpression>) {
+  private getPropsStatement(
+    callExpression: CallExpression<ts.CallExpression>,
+    varName?: string
+  ) {
     const propsStatement = this.getChildOfType(
       callExpression,
       ts.SyntaxKind.PropertyAssignment,
@@ -83,25 +93,34 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
     if (propsStatement === undefined) {
       return undefined;
     }
-    return `const props = defineProps(${propsStatement!
-      .getInitializer()!
-      .getText()});`;
+
+    const constDeclartion = varName ? `const ${varName} =` : "";
+    const propsInitializer = propsStatement!.getInitializer()!.getText();
+
+    return `${constDeclartion} defineProps(${propsInitializer});`;
   }
-  private getEmitStatement(callExpression: CallExpression<ts.CallExpression>) {
+  private getEmitStatement(
+    callExpression: CallExpression<ts.CallExpression>,
+    usesEmits: boolean
+  ) {
     const emitsStatement = this.getChildOfType(
       callExpression,
       ts.SyntaxKind.PropertyAssignment,
-      "emit"
+      "emits"
     );
     if (emitsStatement === undefined) {
       return undefined;
     }
-    return `const emit = defineEmits(${emitsStatement!
-      .getInitializer()!
-      .getText()});`;
+
+    const constDeclartion = usesEmits ? `const emit =` : "";
+    const emitInitializer = emitsStatement!.getInitializer()!.getText();
+    return `${constDeclartion} defineEmits(${emitInitializer});`;
   }
 
-  private getSetupBodyText(callExpression: CallExpression<ts.CallExpression>) {
+  private getSetupBodyText(
+    callExpression: CallExpression<ts.CallExpression>
+  ): Setup | undefined {
+    const setup: Setup = { body: "", usesEmits: false };
     const setupMethod = this.getChildOfType(
       callExpression,
       ts.SyntaxKind.MethodDeclaration,
@@ -112,12 +131,26 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
       return undefined;
     }
 
+    this.analyseSetupArguments(setupMethod, setup);
+
     var setupBody = setupMethod.getBodyOrThrow().getChildSyntaxListOrThrow();
+
     setupBody
       .getChildrenOfKind(ts.SyntaxKind.ReturnStatement)
       .forEach((x) => x.remove());
 
-    return setupBody.getText() ?? undefined;
+    setup.body = setupBody.getText();
+
+    return setup;
+  }
+
+  private analyseSetupArguments(setupMethod: MethodDeclaration, setup: Setup) {
+    const parameters = setupMethod
+      .getChildrenOfKind(ts.SyntaxKind.SyntaxList)[0]
+      .getChildrenOfKind(ts.SyntaxKind.Parameter);
+
+    setup.propName = parameters[0]?.getName();
+    setup.usesEmits = parameters.some((p) => p.getName().includes("emit"));
   }
 
   private addSetupToScript(
@@ -167,4 +200,10 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
       )
       .map((diagnostic) => this.createFix(document, diagnostic.range, "text"));
   }
+}
+
+interface Setup {
+  body: string;
+  propName?: string;
+  usesEmits: boolean;
 }
