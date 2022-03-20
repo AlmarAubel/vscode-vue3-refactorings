@@ -1,8 +1,11 @@
 import * as vscode from "vscode";
 import { Diagnostic } from "../types";
-const toScriptSetup = (doc: vscode.TextDocument): Diagnostic => {
+export const toScriptSetupDiagnostic = (
+  doc: vscode.TextDocument
+): Diagnostic => {
   const text = doc.getText();
 
+  console.log("hit it");
   const textArr: string[] = text.split(/\r\n|\n/);
   const regex = /<script[\s\S]*?lang="ts">/gm;
   const indexOfScriptOpening = textArr.findIndex((value: string) =>
@@ -35,5 +38,3 @@ const toScriptSetup = (doc: vscode.TextDocument): Diagnostic => {
   }
   return null;
 };
-
-export default toScriptSetup;

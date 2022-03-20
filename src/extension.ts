@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { ScriptSetupRefactoring } from "./refactorings/toScriptSetup/toScriptSetupAction";
-import toScriptSetup from "./refactorings/toScriptSetup/toScriptSetupDiagnostic";
+import toScriptSetup from "./refactorings/toScriptSetup";
+import toTypedDefineProps from "./refactorings/toTypedDefineProps";
 // The things we care about in a package.json
 interface PackageJson {
   name: string;
@@ -13,10 +13,14 @@ async function getDiagnostics(
   doc: vscode.TextDocument
 ): Promise<vscode.Diagnostic[]> {
   const diagnostics = new Array<vscode.Diagnostic>();
-  const refactorings = [toScriptSetup];
+  const refactorings = [
+    toScriptSetup.diagnostic,
+    toTypedDefineProps.diagnostic,
+  ];
 
   refactorings.forEach((r) => {
     const diagnostic = r(doc);
+
     diagnostic && diagnostics.push(diagnostic);
   });
 
@@ -42,10 +46,11 @@ export async function activate(context: vscode.ExtensionContext) {
   const didChange = vscode.workspace.onDidChangeTextDocument((e) =>
     handler(e.document)
   );
-  const codeActionProvider = vscode.languages.registerCodeActionsProvider(
-    "vue",
-    new ScriptSetupRefactoring()
-  );
+  const actions = [toScriptSetup.action, toTypedDefineProps.action];
+
+  const codeActionProviders = actions
+    .filter((a) => !!a)
+    .map((a) => vscode.languages.registerCodeActionsProvider("vue", new a!()));
 
   // If we have an activeTextEditor when we open the workspace, trigger the handler
   if (vscode.window.activeTextEditor) {
@@ -57,7 +62,7 @@ export async function activate(context: vscode.ExtensionContext) {
     diagnosticCollection,
     didOpen,
     didChange,
-    codeActionProvider
+    ...codeActionProviders
   );
 }
 
