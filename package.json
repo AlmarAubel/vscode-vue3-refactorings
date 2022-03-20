@@ -3,9 +3,9 @@
 	"displayName": "Vue3 refactorings ",
 	"description": "Helps you to refactor to script setup syntax",
 	"publisher": "AlmarAubel",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"repository": {
-		"url": "",
+		"url": "https://github.com/AlmarAubel/vscode-vue3-refactorings",
 		"type": "git"
 	},
 	"engines": {

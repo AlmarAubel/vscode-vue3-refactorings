@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { ScriptSetupRefactoring } from "./scriptSetupRefacorting";
-
+import { ScriptSetupRefactoring } from "./refactorings/toScriptSetup/toScriptSetupAction";
+import toScriptSetup from "./refactorings/toScriptSetup/toScriptSetupDiagnostic";
 // The things we care about in a package.json
 interface PackageJson {
   name: string;
@@ -12,38 +12,13 @@ interface PackageJson {
 async function getDiagnostics(
   doc: vscode.TextDocument
 ): Promise<vscode.Diagnostic[]> {
-  const text = doc.getText();
   const diagnostics = new Array<vscode.Diagnostic>();
+  const refactorings = [toScriptSetup];
 
-  const textArr: string[] = text.split(/\r\n|\n/);
-  const regex = /<script[\s\S]*?lang="ts">/gm;
-  const indexOfScriptOpening = textArr.findIndex((value: string) =>
-    regex.test(value)
-  );
-  const indexOfScriptClosing = textArr.findIndex((value: string) =>
-    new RegExp(`<\/script>`).test(value)
-  );
-
-  if (
-    indexOfScriptOpening !== -1 &&
-    indexOfScriptClosing !== -1 &&
-    !textArr[indexOfScriptOpening].includes("setup")
-  ) {
-    const start = 0;
-    const end = textArr[indexOfScriptClosing].length;
-    diagnostics.push({
-      severity: vscode.DiagnosticSeverity.Warning,
-      message: `Script can be converted to Script setup`,
-      code: "vuer-can-be-converted-to-script-setup",
-      source: "Vue3 refactorings",
-      range: new vscode.Range(
-        indexOfScriptOpening + 1,
-        start,
-        indexOfScriptClosing - 1,
-        end
-      ),
-    });
-  }
+  refactorings.forEach((r) => {
+    const diagnostic = r(doc);
+    diagnostic && diagnostics.push(diagnostic);
+  });
 
   return diagnostics;
 }
