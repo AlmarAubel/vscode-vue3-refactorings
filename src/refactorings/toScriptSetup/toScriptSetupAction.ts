@@ -12,8 +12,7 @@ import {
 export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
   private createFix(
     document: vscode.TextDocument,
-    range: vscode.Range,
-    emoji: string
+    range: vscode.Range
   ): vscode.CodeAction {
     const fix = new vscode.CodeAction(
       `Refactor to Script setup`,
@@ -213,7 +212,7 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
         (diagnostic) =>
           diagnostic.code === "vuer-can-be-converted-to-script-setup"
       )
-      .map((diagnostic) => this.createFix(document, diagnostic.range, "text"));
+      .map((diagnostic) => this.createFix(document, diagnostic.range));
   }
 }
 

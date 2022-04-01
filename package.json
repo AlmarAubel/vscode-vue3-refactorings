@@ -3,7 +3,7 @@
 	"displayName": "Vue3 refactorings ",
 	"description": "Helps you to refactor to script setup syntax",
 	"publisher": "AlmarAubel",
-	"version": "0.0.3",
+	"version": "0.0.5",
 	"repository": {
 		"url": "https://github.com/AlmarAubel/vscode-vue3-refactorings",
 		"type": "git"
@@ -27,22 +27,33 @@
 		"esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
 		"esbuild": "npm run esbuild-base -- --sourcemap",
 		"esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
-		"pretest": "npm run compile && npm run lint",
 		"lint": "eslint src --ext ts",
-		"test": "node ./out/test/runTest.js"
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"test:run": "vitest run",
+		"test:watch": "vitest watch",
+		"package":"vsce package",
+		"debug": "ts-node ./src/refactorings/toTypedDefineProps/Foo.ts"
+	},
+	"dependencies": {
+		"ts-morph": "^14.0.0"
 	},
 	"devDependencies": {
+		"@phenomnomnominal/tsquery": "^4.2.0",
 		"@types/glob": "^7.2.0",
 		"@types/mocha": "^8.2.2",
 		"@types/node": "14.x",
 		"@types/vscode": "^1.57.0",
 		"@typescript-eslint/eslint-plugin": "^4.26.0",
 		"@typescript-eslint/parser": "^4.26.0",
+		"@vitest/ui": "^0.7.11",
 		"esbuild": "^0.14.27",
-		"eslint": "^7.27.0",
-		"mocha": "^8.4.0",
-		"ts-morph": "^14.0.0",
+		"eslint": "^7.27.0",		
+		"ts-node": "^10.7.0",
 		"typescript": "^4.3.2",
+		"vite": "^2.8.6",
+		"vitest": "^0.7.11",
+		"vsce": "^2.7.0",
 		"vscode-test": "^1.5.2"
 	}
 }
