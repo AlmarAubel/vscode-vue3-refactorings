@@ -1,23 +1,28 @@
 import * as vscode from "vscode";
 import {
-  DirectoryEmitResult,
   ts,
   Project,
   Identifier,
   ObjectLiteralExpression,
+  PropertyAssignment,
   ForEachDescendantTraversalControl,
   CallExpression,
   Node,
 } from "ts-morph";
-import { forEachChild } from "typescript";
-
-export const doeIets = (text: string, range: vscode.Range) => {
+import { forEachChild, Type, visitEachChild } from "typescript";
+interface PropDefinition {
+  identifier: string;
+  type: string;
+  required: boolean;
+  defaultValue?: object; //Should be type of type
+}
+export const doeIets = (text: string) => {
   const project = new Project({});
   const sourcefile = project.createSourceFile("temp.ts", text);
   console.log("----------------------**********_____________");
   const visitors: Visitor[] = [];
-  visitors.push(GetVisitor(range, (node) => console.log(node?.getText())));
-
+  //visitors.push(GetVisitor((node) => console.log(node?.getText())));
+  visitors.push(GetVisitor(updateCode));
   const result = sourcefile.forEachDescendant((node, traversal) => {
     const kind = syntaxKindToString(node.getKind());
 
@@ -31,19 +36,57 @@ export const doeIets = (text: string, range: vscode.Range) => {
       });
   });
 };
+
+function updateCode(path: CallExpression, convertedNode: Node) {
+  const propDefinitions = Array<PropDefinition>();
+  path
+    .getFirstChildByKindOrThrow(ts.SyntaxKind.ObjectLiteralExpression)
+    .getProperties()
+    .forEach((no) => {
+      if (HasObjectLiteralExpression(no)) {
+        const identifier = no.getFirstChildOrThrow().getText();
+        let type = "";
+        let required = false;
+        no.getChildrenOfKind(ts.SyntaxKind.ObjectLiteralExpression).forEach(
+          (x) => {
+            //console.log("111", x.);
+            type = x.getProperty("type")?.getLastChildOrThrow().getText() ?? "";
+            required =
+              x.getProperty("required")?.getLastChildOrThrow().getText() ===
+              "true";
+          }
+        );
+        propDefinitions.push({
+          identifier: identifier,
+          type: type,
+          required: required,
+        });
+      } else {
+        propDefinitions.push({
+          identifier: no.getFirstChildOrThrow().getText(),
+          type: no.getLastChildOrThrow().getText(),
+          required: false,
+        });
+      }
+    });
+  propDefinitions.forEach((p) => console.dir(p));
+}
+function HasObjectLiteralExpression(node: Node): boolean {
+  return !!(
+    node.getChildrenOfKind(ts.SyntaxKind.ObjectLiteralExpression).length > 0
+  );
+}
+
 function GetVisitor(
-  range: vscode.Range,
-  onMatch: (path: Node, convertedNode: Node) => void
+  onMatch: (path: CallExpression, convertedNode: Node) => void
 ): Visitor {
   return {
     CallExpression(node: CallExpression) {
       const functionName = node.getExpression().getText();
+
       if (functionName === "defineProps") {
         onMatch(node, node);
       }
-    },
-    Identifier(node: Identifier) {
-      onMatch(node, node);
     },
   };
 }
@@ -52,41 +95,21 @@ const syntaxKindToString = createEnumWithMarkerToString<ts.SyntaxKind>(
 );
 
 type Visitor = {
-  CallExpression(node: CallExpression): void;
-  Identifier(node: Identifier): void;
+  CallExpression?: (node: CallExpression) => void;
+  Identifier?: (node: Identifier) => void;
 };
-function VisitDefinePropsArguments(
-  identifier: Identifier,
-  traversal: ForEachDescendantTraversalControl
-) {
-  identifier
-    .getSymbol()
-    ?.getDeclarations()
-    .forEach((x) =>
-      x.forEachDescendant((no, trav) => {
-        switch (no.getKind()) {
-          case ts.SyntaxKind.PropertyAssignment:
-          case ts.SyntaxKind.Identifier:
-            console.log(
-              "222eyyy",
-              syntaxKindToString(no.getKind()),
-              no.getText()
-            );
-            traversal.up();
-            break;
-          case ts.SyntaxKind.MethodSignature:
-            trav.up();
-            break;
-          default:
-            console.log(
-              "33333",
-              syntaxKindToString(no.getKind()),
-              no.getText()
-            );
-        }
-      })
-    );
-}
+
+// function VisitDefinePropsArguments(
+//   identifier: Identifier,
+//   traversal: ForEachDescendantTraversalControl
+// ) {
+//   identifier
+//     .getSymbol()
+//     ?.getDeclarations()
+//     .forEach((x) =>
+//       x.forEachDescendant((no, trav) => { }
+
+// }
 function createEnumWithMarkerToString<T extends number = number>(
   enumeration: any
 ) {
