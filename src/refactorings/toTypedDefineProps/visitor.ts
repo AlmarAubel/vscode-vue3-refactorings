@@ -9,18 +9,22 @@ import {
   CallExpression,
   Node,
   ObjectLiteralElementLike,
-  StructureKind
+  StructureKind,
+  InterfaceDeclaration
 } from 'ts-morph';
 import { forEachChild, Type, visitEachChild } from 'typescript';
+import { vueTypeToTsStype } from '../helpers';
+import { makeRe } from 'minimatch';
+import { formatWithOptions } from 'util';
 interface PropDefinition {
   identifier: string;
   type: string;
   required: boolean;
-  defaultValue?: object; //Should be type of type
+  defaultValue?: string; //Should be type of type
 }
 
+const project = new Project({});
 export const doeIets = (text: string) => {
-  const project = new Project({});
   const sourcefile = project.createSourceFile('temp.ts', text);
   console.log('----------------------**********_____________');
   const visitors: Visitor[] = [];
@@ -42,6 +46,7 @@ export const doeIets = (text: string) => {
 
 function updateCode(path: CallExpression, convertedNode: Node) {
   const propDefinitions = Array<PropDefinition>();
+  console.log('path', path.getText());
   path
     .getFirstChildByKindOrThrow(ts.SyntaxKind.ObjectLiteralExpression)
     .getProperties()
@@ -52,14 +57,23 @@ function updateCode(path: CallExpression, convertedNode: Node) {
       } else {
         const structure = no.getStructure();
         if (structure.kind !== StructureKind.PropertyAssignment) return;
+
         propDefinitions.push({
           identifier: structure.name,
-          type: structure.initializer,
+          type: vueTypeToTsStype(structure.initializer),
           required: false
         });
       }
     });
-  propDefinitions.forEach(p => console.dir(p));
+  const lf = '\n';
+  const propsSyntax = propDefinitions.map(p => `${p.identifier}${p.required ? '' : '?'}:${p.type}`);
+  const propDefinitionStatement = `{${propsSyntax.join(';')}}`;
+
+  //todo Add defineDefaultProps when needed.
+  path.getArguments().forEach(a => path.removeArgument(a));
+  path.addTypeArgument(propDefinitionStatement);
+  path.formatText();
+  console.log('path', path.getText());
 }
 
 function getPropDefinitionFromObjectLiteral(node: ObjectLiteralElementLike) {
@@ -68,11 +82,12 @@ function getPropDefinitionFromObjectLiteral(node: ObjectLiteralElementLike) {
   const properties = node.getFirstChildByKindOrThrow(ts.SyntaxKind.ObjectLiteralExpression);
   const type = getType(properties);
   const required = properties.getProperty('required')?.getStructure().initializer === 'true';
-
+  const defaultValue = properties.getProperty('default')?.getStructure().initializer;
   const prop = {
     identifier: identifier,
     type: type,
-    required: required
+    required: required,
+    defaultValue
   };
 
   return prop;
@@ -88,8 +103,8 @@ function getType(node: ObjectLiteralExpression) {
       ?.getText();
   }
   const vueType = type.getStructure().initializer;
-  
-  return ?? '';
+
+  return vueTypeToTsStype(vueType);
 }
 
 function hasAsExpression(node: ObjectLiteralElementLike) {

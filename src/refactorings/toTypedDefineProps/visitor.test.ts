@@ -1,12 +1,17 @@
-import { assert, expect, test } from "vitest";
+import { assert, expect, test } from 'vitest';
 //import { Range } from "vscode";
-import { doeIets } from "./visitor";
+import { doeIets } from './visitor';
 
 const definePropsCode = `
 defineProps({
     productId: {
         type: String,
         required: true
+    },
+    antwoord: {
+        type: String,
+        required: true,
+        default:'Sheep',
     },
     vraag: {
         type: Object as PropType<VragenProductVraagDefinitiesProductVraagDto>,
@@ -29,7 +34,8 @@ const x = {
 defineProps(x);
 aap(1,2);`;
 
-test("Doe iets", () => {
+//Ook nog andere cases fixen zie -> https://vuejs.org/guide/components/props.html#prop-validation
+test('Doe iets', () => {
   doeIets(definePropsCode);
 });
 
