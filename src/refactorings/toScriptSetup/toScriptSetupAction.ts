@@ -61,15 +61,15 @@ export class ScriptSetupRefactoring implements vscode.CodeActionProvider {
     //   ?.filter(i => i.getName() === 'defineComponent')
     //   .forEach(i => i.remove());
 
-    // if (definePropsStatement) {
-    //   sourcefile.addStatements(definePropsStatement);
-    //   vueImportDeclaration?.addNamedImport("defineProps");
-    // }
+    if (definePropsStatement) {
+      sourcefile.addStatements(definePropsStatement);
+      vueImportDeclaration?.addNamedImport('defineProps');
+    }
 
-    // if (defineEmitsStatement) {
-    //   sourcefile.addStatements(defineEmitsStatement);
-    //   vueImportDeclaration?.addNamedImport("defineEmit");
-    // }
+    if (defineEmitsStatement) {
+      sourcefile.addStatements(defineEmitsStatement);
+      vueImportDeclaration?.addNamedImport('defineEmit');
+    }
 
     setup && sourcefile.addStatements(setup.body);
   }
