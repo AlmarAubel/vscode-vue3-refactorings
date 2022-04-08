@@ -1,6 +1,5 @@
 import { assert, expect, test } from 'vitest';
-//import { Range } from "vscode";
-import { doeIets } from './visitor';
+import { TypedDefinePropsAction } from './toTypedDefinePropsAction';
 
 const definePropsCode = `
 defineProps({
@@ -35,8 +34,12 @@ defineProps(x);
 aap(1,2);`;
 
 //Ook nog andere cases fixen zie -> https://vuejs.org/guide/components/props.html#prop-validation
-test('Doe iets', () => {
-  doeIets(definePropsCode);
+test('To typed define props test', () => {
+  const action = new TypedDefinePropsAction();
+  const res = action.visitNodes(definePropsCode);
+  expect(res.getText()).toEqual(
+    `defineProps<{ productId: string; antwoord: string; vraag?: VragenProductVraagDefinitiesProductVraagDto; vragen?: string }>();`
+  );
 });
 
 // test("Doe iets2", () => {

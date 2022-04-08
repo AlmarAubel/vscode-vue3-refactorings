@@ -1,8 +1,6 @@
-import * as vscode from "vscode";
-import { Diagnostic } from "../types";
-export const toTypeDefinePropsDiagnostic = (
-  doc: vscode.TextDocument
-): Diagnostic => {
+import * as vscode from 'vscode';
+import { Diagnostic } from '../types';
+export const toTypeDefinePropsDiagnostic = (doc: vscode.TextDocument): Diagnostic => {
   const text = doc.getText();
 
   const textArr: string[] = text.split(/\r\n|\n/);
@@ -19,9 +17,9 @@ export const toTypeDefinePropsDiagnostic = (
   const diagnostic = {
     severity: vscode.DiagnosticSeverity.Warning,
     message: `DefineProps should be converted to typed version`,
-    code: "vuer-can-be-converted-to-typed-defineProps",
-    source: "Vue3 refactorings",
-    range: range,
+    code: 'vuer-add-typings-to-defineprops',
+    source: 'Vue3 refactorings',
+    range: range
   };
   return diagnostic;
 };
